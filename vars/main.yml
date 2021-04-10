@@ -1,0 +1,37 @@
+---
+ansible_python_interpreter: /usr/bin/python3
+#aws credentails
+aws_access_key: "AKIAJA7JNEZOTOKQ5B4A"
+aws_secret_key: "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"
+region: "us-east-2"
+
+# VPC details
+vpc_cidr: 10.10.0.0/24
+vpc_name: "VPC and client name combination"
+
+# publicSubnet details
+publicsubnet_name: "Subnet and client name combination"
+publicsubnet_cidr: 10.10.0.0/26
+
+# privatesubnnet details
+privatesubnet_name: "Subnet and client name combination"
+privatesubnet_cidr: 172.31.80.0/20
+
+# internet gateway details
+igw_name: "Traffic IGW"
+
+#route table details
+route_name: "Nokia route"
+
+#security group details
+security_name: "Ansible Security Group"
+
+#Keypair creation
+ec2_key_directory: "/home/nokia-key"
+keypair_name: "nokia_key"
+
+# Ec2 tagging
+ec2_tag: "WebServer"
+ec2-image: "ami-03d64741867e7bb94"
+instance_type: "t2.micro"
+...

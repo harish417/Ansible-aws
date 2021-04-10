@@ -1,0 +1,204 @@
+---
+- name: create VPC
+  ec2_vpc_net:
+    name: "{{ vpc_name }}"
+    cidr_block: "{{ vpc_cidr }}"
+    region: "{{ region }}"
+    state: present
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+  register: virtual
+- debug:
+    var: virtual
+
+- name: vpc id variable creation
+  vars:
+   msg: |
+    vpc_id: {{ virtual.vpc.id }}
+  debug: 
+   msg: "{{ msg.split('\n') }}"
+  
+- name: associate subnet to the  VPC
+  ec2_vpc_subnet:
+    state: present
+    vpc_id: "{{ virtual.vpc.id }}"
+    region: "{{ region }}"
+    cidr: "{{ publicsubnet_cidr }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    map_public: yes
+    resource_tags:
+      Name: "{{ publicsubnet_name }}"
+  register: publicsubnet
+
+- debug:
+    var=publicsubnet
+
+- name: public subnet variable creation
+  vars:
+   msg: |
+    subnets: {{ publicsubnet.subnet.id }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+
+- name: associate subnet to the  VPC
+  ec2_vpc_subnet:
+    state: present
+    vpc_id: "{{ virtual.vpc.id }}"
+    region: "{{ region }}"
+    cidr: "{{ privatesubnet_cidr }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    resource_tags:
+      Name: "{{ privatesubnet_name }}"
+  register: privatesubnet
+
+- debug:
+    var=privatesubnet
+
+- name: private subnet variable creation
+  vars:
+   msg: |
+    subnets: {{ privatesubnet.subnet.id }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+  
+- name: create IGW
+  ec2_vpc_igw:
+    vpc_id: "{{ virtual.vpc.id }}"
+    region: "{{ region }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    state: "present"
+    tags:
+      Name: "{{ igw_name }}"
+  register: igw 
+  
+- debug:
+    var=igw
+
+- name: gateway variable creation
+  vars:
+   msg: |
+    gateway_id: {{ igw.gateway_id }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+
+
+- name: Route IGW
+  ec2_vpc_route_table:
+   vpc_id: "{{ virtual.vpc.id }}"
+   region: "{{ region }}"
+   aws_access_key: "{{ aws_access_key }}"
+   aws_secret_key: "{{ aws_secret_key }}"
+   subnets:
+     - "{{ publicsubnet.subnet.id }}"
+   routes:
+     - dest: 0.0.0.0/0
+       gateway_id: "{{ igw.gateway_id  }}"
+   tags:
+     Name: "{{ route_name }}"
+
+ - debug:
+    var=route
+
+- name: route table creation
+  vars:
+   msg: |
+    route_table_id: {{ route.route_table.route_table_id }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+
+
+- name: create sg
+  ec2_group:
+    name: "{{ security_name }}"
+    description: "{{ security_name }}"
+    region: "{{ region }}"
+    vpc_id: "{{ virtual.vpc.id }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        from_port: 80
+        to_port: 80
+        cidr_ip: 0.0.0.0/0
+    rules_egress:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: security_group
+
+- debug:
+    var: security_group
+- name: security group variable creation
+  vars:
+   msg: |
+    group_id: {{ security_group.group_id }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+
+- name: create a new ec2 key pair, returns generated private key
+  ec2_key:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    name: "{{ keypair_name }}"
+    region: "{{ region }}"
+  register: keypair
+  tags:
+    - nokia_key
+
+- debug:
+    var: keypair
+
+- name: Create a copy of keypair in local host
+  copy: content="{{ keypair.key.private_key }}" dest="{{ ec2_key_directory }}.ppk"  mode=0600
+  when: keypair.changed
+  tags:
+    - nokia_key
+
+- name: Create EC2 Instance
+  ec2:
+    image: "{{ ec2-image }}"
+    wait: yes
+    instance_type: "{{ instance_type }}"
+    region: "{{ region }}"
+    group_id: "{{ security_group.group_id }}"
+    vpc_subnet_id: "{{ publicsubnet.subnet.id }}"
+    key_name: "{{ keypair.key.name }}"
+    count_tag: "{{ ec2_tag }}"
+    exact_count: 1
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+
+- debug:
+    var: instance
+
+- name: Ec2 instance variable creation
+  vars:
+   msg: |
+    device_id: {{ instance.instance_ids }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+
+- name: Create elastic Ip and allocte to instance
+  ec2_eip:
+    state: present
+    device_id: "{{ instance.instance_ids }}"
+    region: "{{ region }}"
+  register: eip
+
+- debug:
+    var: eip
+
+- name: create eip variable
+  vars:
+   msg: |
+    public_ip: {{ eip.public_ip }}
+  debug:
+   msg: "{{ msg.split('\n') }}"
+...
+
