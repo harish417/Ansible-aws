@@ -1,8 +1,8 @@
 ---
 ansible_python_interpreter: /usr/bin/python3
 #aws credentails
-aws_access_key: "AKIAJA7JNEZOTOKQ5B4A"
-aws_secret_key: "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"
+aws_access_key: ""
+aws_secret_key: ""
 region: "us-east-2"
 
 # VPC details
